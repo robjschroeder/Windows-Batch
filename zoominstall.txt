@@ -1,0 +1,107 @@
+@ECHO OFF
+
+# Installs latest Zoom to Program Files
+# rjs41 3/12/2018
+
+# Variables Passed Down From Kaseya
+SET loc=%1
+SET ver=%2
+SET new-ver=%3
+IF "%loc%"=="" GOTO Loc
+IF "%ver%"=="" GOTO Ver
+IF "%new-ver%"=="" GOTO new-ver
+GOTO Variable-2
+::=========================================================================================
+:Loc
+:: Prompts for input if none is provided in the command line
+CLS
+ECHO The full path is needed
+ECHO (i.e. \\server.domain.com\path)
+SET /P loc=Enter the source you are copying from:
+IF "%loc%"=="" GOTO Loc
+::=========================================================================================
+:Ver
+:: Prompts for input if none is provided in the command line
+CLS
+SET /P ver=Enter the Zoom "Version" (i.e. '4.3.46260.0122'):
+IF "%ver%"=="" GOTO Ver
+::=========================================================================================
+:new-Ver
+:: Prompts for input if none is provided in the command line
+CLS
+SET /P new-ver=Enter the Zoom "Version" that will be returned via wmic output (i.e. 4.3.46260):
+IF "%new-ver%"=="" GOTO new-ver
+::=========================================================================================
+:Variable-2
+:: Define the required variables
+SET switches=/quiet /qn /norestart
+::=========================================================================================
+:Cleanup
+:: This is used to Cleanup the C:\Temp Directory
+:: DO NOT MODIFY THIS SECTION
+IF EXIST "C:\Temp\Err.txt" DEL /Q "C:\Temp\Err.txt"
+::=========================================================================================
+:::x32-x64
+:: Test if x64
+::IF NOT EXIST C:\Windows\SysWOW64 GOTO 32Bit-W7
+::Echo Checking if Zoom is installed and if it is, checking the version
+::IF NOT EXIST "%ProgramFiles(x86)%\Zoom" GOTO CopyInstallers
+::for /f "skip=1 tokens=2 delims=," %%A in ('wmic product where "name like 'Zoom%%'" get version /format:csv') DO SET old-ver=%%A
+::IF %old-ver% EQU %new-ver% GOTO Err-Exist
+::IF %old-ver% NEQ %new-ver% GOTO UninstallOld
+::GOTO CopyInstallers
+::=========================================================================================
+:::32Bit-W7
+::Echo Checking if Zoom is installed and if it is, checking the version
+::IF NOT EXIST "%ProgramFiles%\Zoom" GOTO CopyInstallers
+::for /f "skip=1 tokens=2 delims=," %%A in ('wmic product where "name like 'Zoom%%'" get version /format:csv') DO SET old-ver=%%A
+::IF %old-ver% EQU %new-ver% GOTO Err-Exist
+::IF %old-ver% NEQ %new-ver% GOTO UninstallOld
+::GOTO CopyInstallers
+::=========================================================================================
+:::UninstallOld
+::wmic product where "name like 'zoom'" call uninstall /nointeractive | wmic && shutdown /a
+::GOTO CopyInstallers
+::=========================================================================================
+:CopyInstallers
+XCOPY "%loc%"\ZoomInstallerFull.msi "C:\Temp\Zoom\" /E /R /Y
+GOTO Install
+::=========================================================================================
+:Install
+MsiExec.exe /i C:\Temp\Zoom\ZoomInstallerFull.msi /quiet /qn /norestart
+IF %ERRORLEVEL% NEQ 0 GOTO Err-Failed
+::=========================================================================================
+:SFlags
+:: Remove old successful install flags and publish current version flag.
+IF EXIST "C:\!!Successful Installs\Zoom*.txt" DEL /F /Q "C:\!!Successful Installs\Zoom*.txt"
+ECHO Zoom %ver% was installed successfully on %DATE% at %TIME%. >"C:\!!Successful Installs\Zoom v%ver%.txt"
+IF %ERRORLEVEL%==0 GOTO Cleanup
+::=========================================================================================
+:Cleanup
+:: Remove Temp Directory Contents
+RD /S /Q "C:\Temp\Zoom"
+GOTO END
+::=========================================================================================
+::       ****************************************
+::       *             Error Messages           *
+::       ****************************************
+:Err-Failed
+:: Installation Failed
+ECHO Installation Failed with exit code: %errorlevel%. >> "C:\Temp\Err.txt"
+GOTO END
+::=========================================================================================
+:Err-NO-OS
+:: Write No Operating System Error Message
+ECHO No Valid Operating System Installed >> "C:\Temp\Err.txt"
+GOTO END
+::=========================================================================================
+:Err-Exist
+ECHO Zoom %ver% is already installed >> "C:\Temp\Err.txt"
+GOTO END
+::=========================================================================================
+:Err-Outdated
+ECHO Zoom %ver% is older than the version installed. >> "C:\Temp\Err.txt"
+GOTO END
+::=========================================================================================
+:END
+EXIT /B
